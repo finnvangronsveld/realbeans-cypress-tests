@@ -2,7 +2,7 @@ Cypress.on("uncaught:exception", () => {
   return false;
 });
 
-const storeUrl = "https://r1043273-realbeans.myshopify.com/";
+const storeUrl = "https://r1043273-realbeans.myshopify.com";
 const password = "loseab";
 
 const introText =
@@ -29,32 +29,58 @@ const products = [
 function acceptCookiesIfVisible() {
   cy.get("body").then(($body) => {
     if ($body.text().includes("Cookie consent")) {
-      cy.contains("button", "Accept").click();
+      cy.contains("button", "Accept").click({ force: true });
     }
   });
 }
 
-function unlockStore() {
-  cy.visit(storeUrl);
+function loginOnce() {
+  cy.session("shopify-password-session", () => {
+    cy.visit(storeUrl, {
+      timeout: 180000,
+      failOnStatusCode: false,
+    });
 
-  cy.get("body").then(($body) => {
-    if ($body.find('input[type="password"]').length > 0) {
-      cy.get('input[type="password"]').type(password + "{enter}");
-      cy.url().should("not.include", "/password");
-    }
+    cy.get("body", { timeout: 30000 }).then(($body) => {
+      if ($body.find('input[type="password"]').length > 0) {
+        cy.get('input[type="password"]').type(password + "{enter}");
+      }
+    });
+
+    cy.url({ timeout: 60000 }).should("not.include", "/password");
+    acceptCookiesIfVisible();
   });
-
-  acceptCookiesIfVisible();
 }
 
 function visitPage(path = "") {
-  unlockStore();
-  cy.visit(storeUrl + path);
+  loginOnce();
+
+  cy.visit(`${storeUrl}/${path}`, {
+    timeout: 180000,
+    failOnStatusCode: false,
+  });
+
+  cy.get("body", { timeout: 30000 }).then(($body) => {
+    const bodyText = $body.text();
+
+    if (
+      bodyText.includes("Service Unavailable") ||
+      bodyText.includes("503")
+    ) {
+      cy.wait(5000);
+
+      cy.visit(`${storeUrl}/${path}`, {
+        timeout: 180000,
+        failOnStatusCode: false,
+      });
+    }
+  });
+
   acceptCookiesIfVisible();
 }
 
 function visibleText(text) {
-  cy.contains("main", text).should("be.visible");
+  cy.contains("main", text, { timeout: 30000 }).should("be.visible");
 }
 
 describe("RealBeans Shopify webshop", () => {
@@ -88,13 +114,13 @@ describe("RealBeans Shopify webshop", () => {
   it("sorting by price changes product order", () => {
     visitPage("collections/all?sort_by=price-ascending");
 
-    cy.get('main a[href*="/products/"]:visible')
+    cy.get('main a[href*="/products/"]:visible', { timeout: 30000 })
       .first()
       .should("contain.text", "Roasted coffee beans 5kg");
 
     visitPage("collections/all?sort_by=price-descending");
 
-    cy.get('main a[href*="/products/"]:visible')
+    cy.get('main a[href*="/products/"]:visible', { timeout: 30000 })
       .first()
       .should("contain.text", "Blended coffee 5kg");
   });
@@ -107,7 +133,7 @@ describe("RealBeans Shopify webshop", () => {
       visibleText(product.price);
       visibleText(product.description);
 
-      cy.get("main img:visible").should("exist");
+      cy.get("main img:visible", { timeout: 30000 }).should("exist");
     });
   });
 
