@@ -1,6 +1,8 @@
 const { defineConfig } = require("cypress");
 
 module.exports = defineConfig({
+  projectId: "egdhfg",
+
   e2e: {
     pageLoadTimeout: 180000,
     defaultCommandTimeout: 15000,
